@@ -9,6 +9,13 @@
   port = 8888
   autoLaunch = false
 
+# Proxy /api/* to Netlify Functions — must come BEFORE the SPA catch-all
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA catch-all — serves index.html for all non-API, non-file routes
 [[redirects]]
   from = "/*"
   to = "/index.html"

@@ -1,5 +1,7 @@
+const API_URL = '/api/claude'
+
 export async function callClaude(prompt, systemPrompt = '') {
-  const res = await fetch('/.netlify/functions/claude', {
+  const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, systemPrompt }),
@@ -15,7 +17,7 @@ export async function callClaude(prompt, systemPrompt = '') {
 }
 
 export async function callClaudeWithPdf(pdfBase64, prompt, systemPrompt = '') {
-  const res = await fetch('/.netlify/functions/claude', {
+  const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, systemPrompt, pdfBase64 }),
