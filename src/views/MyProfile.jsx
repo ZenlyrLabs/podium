@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Upload, Save, Check, User, Loader2 } from 'lucide-react'
 import { getProfile, saveProfile } from '../utils/storage'
-import { callClaude } from '../utils/api'
+import { callClaude, callClaudeWithPdf } from '../utils/api'
 import './MyProfile.css'
 
 export default function MyProfile() {
@@ -34,22 +34,41 @@ export default function MyProfile() {
     setParseError('')
 
     try {
-      const text = await file.text()
-      const result = await callClaude(
-        `Extract the following from this LinkedIn profile text and return as JSON with keys: name, headline, summary (a 2-3 sentence professional summary), topics (comma-separated list of topics they likely post about).\n\nProfile text:\n${text.slice(0, 4000)}`,
-        'You are a profile parser. Return valid JSON only, no other text.'
-      )
-      const parsed = JSON.parse(result.trim())
+      const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf')
+
+      let result
+      if (isPdf) {
+        const arrayBuffer = await file.arrayBuffer()
+        const base64 = btoa(
+          new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+        )
+        result = await callClaudeWithPdf(
+          base64,
+          'Extract the following from this LinkedIn profile PDF and return as JSON with keys: name, headline, summary (a 2-3 sentence professional summary), topics (comma-separated list of topics they likely post about).',
+          'You are a profile parser. Return valid JSON only, no other text.'
+        )
+      } else {
+        const text = await file.text()
+        result = await callClaude(
+          `Extract the following from this LinkedIn profile text and return as JSON with keys: name, headline, summary (a 2-3 sentence professional summary), topics (comma-separated list of topics they likely post about).\n\nProfile text:\n${text.slice(0, 4000)}`,
+          'You are a profile parser. Return valid JSON only, no other text.'
+        )
+      }
+
+      const cleaned = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      const parsed = JSON.parse(cleaned)
       setProfile((prev) => ({
         name: parsed.name || prev.name,
         headline: parsed.headline || prev.headline,
         summary: parsed.summary || prev.summary,
         topics: parsed.topics || prev.topics,
       }))
-    } catch {
+    } catch (err) {
+      console.error('Profile parse error:', err)
       setParseError('Could not parse the file. Try a plain-text export of your LinkedIn profile.')
     }
     setParsing(false)
+    if (fileRef.current) fileRef.current.value = ''
   }
 
   return (

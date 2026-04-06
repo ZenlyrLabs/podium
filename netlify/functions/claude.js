@@ -1,17 +1,57 @@
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+function respond(statusCode, body) {
+  return {
+    statusCode,
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    body: JSON.stringify(body),
+  }
+}
+
 export async function handler(event) {
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: CORS_HEADERS, body: '' }
+  }
+
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) }
+    return respond(405, { error: 'Method not allowed' })
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'API key not configured' }) }
+    return respond(500, { error: 'API key not configured' })
   }
 
   try {
-    const { prompt, systemPrompt } = JSON.parse(event.body)
+    const { prompt, systemPrompt, pdfBase64 } = JSON.parse(event.body)
 
-    const messages = [{ role: 'user', content: prompt }]
+    let userContent
+
+    if (pdfBase64) {
+      // Use Anthropic's document content type for PDF files
+      userContent = [
+        {
+          type: 'document',
+          source: {
+            type: 'base64',
+            media_type: 'application/pdf',
+            data: pdfBase64,
+          },
+        },
+        {
+          type: 'text',
+          text: prompt,
+        },
+      ]
+    } else {
+      userContent = prompt
+    }
+
+    const messages = [{ role: 'user', content: userContent }]
 
     const body = {
       model: 'claude-sonnet-4-20250514',
@@ -35,24 +75,18 @@ export async function handler(event) {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}))
-      return {
-        statusCode: response.status,
-        body: JSON.stringify({ error: err.error?.message || 'Anthropic API error' }),
-      }
+      console.error('Anthropic API error:', JSON.stringify(err))
+      return respond(response.status, {
+        error: err.error?.message || `Anthropic API error (${response.status})`,
+      })
     }
 
     const data = await response.json()
     const content = data.content?.[0]?.text || ''
 
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    }
+    return respond(200, { content })
   } catch (err) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: err.message || 'Internal server error' }),
-    }
+    console.error('Function error:', err)
+    return respond(500, { error: err.message || 'Internal server error' })
   }
 }
