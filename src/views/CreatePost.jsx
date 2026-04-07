@@ -5,6 +5,10 @@ import { callClaude } from '../utils/api'
 import { saveDraft, getProfile } from '../utils/storage'
 import './CreatePost.css'
 
+function stripMarkdownFences(text) {
+  return text.replace(/```(?:json)?\s*\n?/g, '').trim()
+}
+
 const TOPICS = [
   'Leadership & Management',
   'Career Growth',
@@ -73,7 +77,7 @@ export default function CreatePost({ editingDraft, onClearDraft }) {
         `Generate 4 compelling LinkedIn post hooks/opening lines about "${activeTopic}" in a ${style} style. Each hook should be 1-2 sentences that grab attention and make people want to read more.${profileContext}\n\nReturn ONLY a JSON array of 4 strings, no other text.`,
         'You are an expert LinkedIn content creator. Return valid JSON only.'
       )
-      const parsed = JSON.parse(result.trim())
+      const parsed = JSON.parse(stripMarkdownFences(result))
       setHooks(Array.isArray(parsed) ? parsed : [])
       setStep(3)
     } catch (e) {
