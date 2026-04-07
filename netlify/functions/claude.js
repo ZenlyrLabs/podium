@@ -31,12 +31,20 @@ export async function handler(event) {
   }
 
   try {
-    const { prompt, systemPrompt, pdfBase64 } = JSON.parse(event.body)
-    console.log('[claude] Prompt length:', prompt?.length, 'hasPdf:', !!pdfBase64, 'hasSystem:', !!systemPrompt)
+    // Netlify may base64-encode large request bodies
+    let rawBody = event.body
+    if (event.isBase64Encoded) {
+      rawBody = Buffer.from(event.body, 'base64').toString('utf-8')
+      console.log('[claude] Decoded base64-encoded request body')
+    }
+
+    const { prompt, systemPrompt, pdfBase64 } = JSON.parse(rawBody)
+    console.log('[claude] Prompt length:', prompt?.length, 'hasPdf:', !!pdfBase64, 'pdfSize:', pdfBase64?.length ?? 0, 'hasSystem:', !!systemPrompt)
 
     let userContent
+    const hasPdf = !!pdfBase64
 
-    if (pdfBase64) {
+    if (hasPdf) {
       userContent = [
         {
           type: 'document',
@@ -67,15 +75,22 @@ export async function handler(event) {
       requestBody.system = systemPrompt
     }
 
+    // Build headers — PDF document type requires the beta header
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    }
+    if (hasPdf) {
+      headers['anthropic-beta'] = 'pdfs-2024-09-25'
+      console.log('[claude] Added PDF beta header')
+    }
+
     console.log('[claude] Calling Anthropic API...')
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers,
       body: JSON.stringify(requestBody),
     })
 

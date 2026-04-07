@@ -65,7 +65,8 @@ export default function MyProfile() {
       }))
     } catch (err) {
       console.error('Profile parse error:', err)
-      setParseError('Could not parse the file. Try a plain-text export of your LinkedIn profile.')
+      const detail = err.message || String(err)
+      setParseError(`Could not parse the file: ${detail}`)
     }
     setParsing(false)
     if (fileRef.current) fileRef.current.value = ''
