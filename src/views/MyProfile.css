@@ -57,3 +57,24 @@
 .form-group textarea.text-input {
   resize: vertical;
 }
+
+.form-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.form-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.voice-samples {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.profile-desc strong {
+  color: var(--gold);
+}

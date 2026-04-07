@@ -9,6 +9,43 @@ function stripMarkdownFences(text) {
   return text.replace(/```(?:json)?\s*\n?/g, '').trim()
 }
 
+function buildAuthorBrief(profile) {
+  const sections = []
+  sections.push('=== AUTHOR BRIEF ===')
+
+  if (profile.name) sections.push(`Name: ${profile.name}`)
+  if (profile.headline) sections.push(`Role: ${profile.headline}`)
+  if (profile.summary) sections.push(`Career Summary: ${profile.summary}`)
+
+  if (profile.accomplishments) {
+    const items = profile.accomplishments.split('\n').filter(Boolean).map(a => `  - ${a.trim()}`)
+    if (items.length) sections.push(`Key Accomplishments:\n${items.join('\n')}`)
+  }
+
+  if (profile.expertise) {
+    const items = profile.expertise.split('\n').filter(Boolean)
+    sections.push(`Expertise: ${items.join(', ')}`)
+  }
+
+  if (profile.communicationStyle) {
+    sections.push(`Communication Style: ${profile.communicationStyle}`)
+  }
+
+  if (profile.topics) sections.push(`Topics: ${profile.topics}`)
+
+  if (profile.voiceSamples?.trim()) {
+    sections.push(`\n=== VOICE SAMPLES (match this writing style closely) ===`)
+    sections.push(profile.voiceSamples.trim())
+  }
+
+  sections.push('=== END AUTHOR BRIEF ===')
+  return sections.join('\n')
+}
+
+const HOOK_SYSTEM = `You are a LinkedIn ghostwriter who writes in the exact voice and style of the author described below. Study their voice samples carefully — match their sentence structure, vocabulary, rhythm, and personality. Hooks should feel like something this specific person would write, not a generic content creator. Return valid JSON only — an array of 4 strings.`
+
+const POST_SYSTEM = `You are a LinkedIn ghostwriter who writes in the exact voice and style of the author described below. Study their voice samples carefully — match their sentence structure, vocabulary, rhythm, and personality precisely. Draw on their real accomplishments and expertise to add specific, authentic details. Never sound generic, corporate, or like a template. Write the post content only — no explanations, preamble, or hashtags.`
+
 const TOPICS = [
   'Leadership & Management',
   'Career Growth',
@@ -69,13 +106,11 @@ export default function CreatePost({ editingDraft, onClearDraft }) {
     setLoading(true)
     setError('')
     const profile = getProfile()
-    const profileContext = profile.summary
-      ? `\nAuthor context: ${profile.name || 'Professional'}, ${profile.headline || ''}. ${profile.summary}`
-      : ''
+    const brief = profile.name ? `\n\n${buildAuthorBrief(profile)}` : ''
     try {
       const result = await callClaude(
-        `Generate 4 compelling LinkedIn post hooks/opening lines about "${activeTopic}" in a ${style} style. Each hook should be 1-2 sentences that grab attention and make people want to read more.${profileContext}\n\nReturn ONLY a JSON array of 4 strings, no other text.`,
-        'You are an expert LinkedIn content creator. Return valid JSON only.'
+        `Generate 4 compelling LinkedIn post hooks/opening lines about "${activeTopic}" in a ${style} style. Each hook should be 1-2 sentences that grab attention and feel authentically written by this author — not generic.${brief}\n\nReturn ONLY a JSON array of 4 strings, no other text.`,
+        HOOK_SYSTEM
       )
       const parsed = JSON.parse(stripMarkdownFences(result))
       setHooks(Array.isArray(parsed) ? parsed : [])
@@ -90,13 +125,11 @@ export default function CreatePost({ editingDraft, onClearDraft }) {
     setLoading(true)
     setError('')
     const profile = getProfile()
-    const profileContext = profile.summary
-      ? `\nAuthor context: ${profile.name || 'Professional'}, ${profile.headline || ''}. ${profile.summary}`
-      : ''
+    const brief = profile.name ? `\n\n${buildAuthorBrief(profile)}` : ''
     try {
       const result = await callClaude(
-        `Write a LinkedIn post about "${activeTopic}" in a ${style} style. Start with this hook: "${selectedHook}"${profileContext}\n\nThe post should be 150-250 words, engaging, and optimized for LinkedIn. Include relevant line breaks for readability. End with a thought-provoking question or call to action. Do NOT include hashtags.`,
-        'You are an expert LinkedIn ghostwriter. Write the post content only, no explanations.'
+        `Write a LinkedIn post about "${activeTopic}" in a ${style} style. Start with this hook: "${selectedHook}"${brief}\n\nRequirements:\n- 150-250 words, optimized for LinkedIn\n- Use line breaks for readability\n- Reference the author's real experience and accomplishments where relevant\n- End with a thought-provoking question or call to action\n- Do NOT include hashtags\n- Must sound like the author wrote it, not a ghostwriter`,
+        POST_SYSTEM
       )
       setPostContent(result.trim())
       setStep(4)

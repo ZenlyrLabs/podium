@@ -1,11 +1,35 @@
 import { useState, useEffect, useRef } from 'react'
-import { Upload, Save, Check, User, Loader2 } from 'lucide-react'
+import { Upload, Save, Check, Loader2 } from 'lucide-react'
 import { getProfile, saveProfile } from '../utils/storage'
 import { callClaude, callClaudeWithPdf } from '../utils/api'
 import './MyProfile.css'
 
+const EXTRACT_PROMPT = `Analyze this LinkedIn profile thoroughly and return a JSON object with these keys:
+
+- "name": full name
+- "headline": current job title and company
+- "summary": a 3-4 sentence career narrative covering their arc, what drives them, and what they're known for
+- "accomplishments": an array of 3-5 specific career achievements — include hard metrics, numbers, percentages, team sizes, revenue figures, or growth stats wherever possible (e.g. "Scaled engineering org from 5 to 40 engineers in 18 months")
+- "expertise": an array of 4-8 core skill/domain areas they are strongest in
+- "communicationStyle": a comma-separated string of 3-5 tone descriptors that characterize how this person likely communicates based on their profile (e.g. "direct, data-oriented, uses storytelling, dry humor, concise")
+- "signaturePhrases": an array of 2-4 recurring phrases, terminology, or language patterns found in the profile text
+- "topics": a comma-separated string of topics they likely post about based on their experience
+
+Be specific, not generic. Pull real details from the profile. If a field cannot be determined, use an empty string or empty array.`
+
+const EXTRACT_SYSTEM = 'You are an expert profile analyst. Return valid JSON only, no other text or markdown.'
+
 export default function MyProfile() {
-  const [profile, setProfile] = useState({ name: '', headline: '', summary: '', topics: '' })
+  const [profile, setProfile] = useState({
+    name: '',
+    headline: '',
+    summary: '',
+    accomplishments: '',
+    expertise: '',
+    communicationStyle: '',
+    topics: '',
+    voiceSamples: '',
+  })
   const [saved, setSaved] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [parseError, setParseError] = useState('')
@@ -13,7 +37,7 @@ export default function MyProfile() {
 
   useEffect(() => {
     const stored = getProfile()
-    if (stored.name) setProfile(stored)
+    if (stored.name) setProfile((prev) => ({ ...prev, ...stored }))
   }, [])
 
   function handleChange(field, value) {
@@ -24,6 +48,12 @@ export default function MyProfile() {
     saveProfile(profile)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  function formatArrayField(val) {
+    if (Array.isArray(val)) return val.join('\n')
+    if (typeof val === 'string') return val
+    return ''
   }
 
   async function handlePdfUpload(e) {
@@ -42,25 +72,26 @@ export default function MyProfile() {
         const base64 = btoa(
           new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
         )
-        result = await callClaudeWithPdf(
-          base64,
-          'Extract the following from this LinkedIn profile PDF and return as JSON with keys: name, headline, summary (a 2-3 sentence professional summary), topics (comma-separated list of topics they likely post about).',
-          'You are a profile parser. Return valid JSON only, no other text.'
-        )
+        result = await callClaudeWithPdf(base64, EXTRACT_PROMPT, EXTRACT_SYSTEM)
       } else {
         const text = await file.text()
         result = await callClaude(
-          `Extract the following from this LinkedIn profile text and return as JSON with keys: name, headline, summary (a 2-3 sentence professional summary), topics (comma-separated list of topics they likely post about).\n\nProfile text:\n${text.slice(0, 4000)}`,
-          'You are a profile parser. Return valid JSON only, no other text.'
+          `${EXTRACT_PROMPT}\n\nProfile text:\n${text.slice(0, 6000)}`,
+          EXTRACT_SYSTEM
         )
       }
 
       const cleaned = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
       const parsed = JSON.parse(cleaned)
+
       setProfile((prev) => ({
+        ...prev,
         name: parsed.name || prev.name,
         headline: parsed.headline || prev.headline,
         summary: parsed.summary || prev.summary,
+        accomplishments: formatArrayField(parsed.accomplishments) || prev.accomplishments,
+        expertise: formatArrayField(parsed.expertise) || prev.expertise,
+        communicationStyle: parsed.communicationStyle || prev.communicationStyle,
         topics: parsed.topics || prev.topics,
       }))
     } catch (err) {
@@ -79,7 +110,7 @@ export default function MyProfile() {
       </div>
 
       <p className="profile-desc">
-        Your profile helps the AI write posts that sound like you. Upload your LinkedIn PDF or fill in details manually.
+        Your profile helps the AI write posts that sound like <strong>you</strong>, not a generic thought leader. Upload your LinkedIn PDF and paste a few of your own posts for best results.
       </p>
 
       <div className="upload-area" onClick={() => fileRef.current?.click()}>
@@ -93,13 +124,13 @@ export default function MyProfile() {
         {parsing ? (
           <>
             <Loader2 className="spinner" size={28} />
-            <span>Parsing your profile...</span>
+            <span>Analyzing your profile...</span>
           </>
         ) : (
           <>
             <Upload size={28} />
             <span>Upload LinkedIn PDF / Text file</span>
-            <span className="upload-hint">Click to browse or drag and drop</span>
+            <span className="upload-hint">Extracts your accomplishments, expertise, and communication style</span>
           </>
         )}
       </div>
@@ -128,14 +159,37 @@ export default function MyProfile() {
         </div>
 
         <div className="form-group">
-          <label>Professional Summary</label>
+          <label>Career Summary</label>
           <textarea
             className="text-input"
             value={profile.summary}
             onChange={(e) => handleChange('summary', e.target.value)}
             rows={4}
-            placeholder="A short summary of your experience and expertise..."
+            placeholder="Your career arc, what drives you, what you're known for..."
           />
+        </div>
+
+        <div className="form-group">
+          <label>Key Accomplishments</label>
+          <textarea
+            className="text-input"
+            value={profile.accomplishments}
+            onChange={(e) => handleChange('accomplishments', e.target.value)}
+            rows={4}
+            placeholder={"Scaled engineering team from 5 to 40 in 18 months\nLaunched product used by 2M+ users\nReduced deploy time by 70%"}
+          />
+          <span className="form-hint">One per line. Include specific metrics and numbers.</span>
+        </div>
+
+        <div className="form-group">
+          <label>Communication Style</label>
+          <input
+            className="text-input"
+            value={profile.communicationStyle}
+            onChange={(e) => handleChange('communicationStyle', e.target.value)}
+            placeholder="e.g. direct, uses storytelling, data-oriented, dry humor"
+          />
+          <span className="form-hint">How would you describe your writing tone?</span>
         </div>
 
         <div className="form-group">
@@ -146,6 +200,20 @@ export default function MyProfile() {
             onChange={(e) => handleChange('topics', e.target.value)}
             placeholder="e.g. Leadership, AI, Product Management"
           />
+        </div>
+
+        <div className="form-divider" />
+
+        <div className="form-group">
+          <label>Voice Samples</label>
+          <textarea
+            className="text-input voice-samples"
+            value={profile.voiceSamples}
+            onChange={(e) => handleChange('voiceSamples', e.target.value)}
+            rows={8}
+            placeholder={"Paste 2-3 of your past LinkedIn posts here. This is the single most important field for matching your voice.\n\nExample:\n---\nI turned down a promotion last year. Here's why...\n(paste the full post)\n---\nEvery engineer I've hired in the last 5 years had one thing in common...\n(paste the full post)"}
+          />
+          <span className="form-hint">The AI will analyze your sentence structure, vocabulary, and tone to generate posts that sound authentically like you.</span>
         </div>
 
         <button className="btn-primary" onClick={handleSave}>
