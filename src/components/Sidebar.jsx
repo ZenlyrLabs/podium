@@ -10,31 +10,27 @@ const navItems = [
 
 export default function Sidebar({ active, onNavigate }) {
   return (
-    <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="sidebar-logo">P</div>
-        <div>
-          <h1 className="sidebar-title">Podium</h1>
-          <span className="sidebar-subtitle">by Zenlyr Labs</span>
+    <header className="topbar">
+      <div className="topbar-inner">
+        <div className="topbar-brand">
+          <div className="topbar-logo">P</div>
+          <div className="topbar-title">Podium</div>
+          <span className="topbar-subtitle">by Zenlyr Labs</span>
         </div>
-      </div>
 
-      <nav className="sidebar-nav">
-        {navItems.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            className={`nav-item ${active === id ? 'active' : ''}`}
-            onClick={() => onNavigate(id)}
-          >
-            <Icon size={18} />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
-
-      <div className="sidebar-footer">
-        <span>Powered by Claude AI</span>
+        <nav className="topbar-nav">
+          {navItems.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              className={`topbar-item ${active === id ? 'active' : ''}`}
+              onClick={() => onNavigate(id)}
+            >
+              <Icon size={16} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
       </div>
-    </aside>
+    </header>
   )
 }
