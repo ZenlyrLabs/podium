@@ -39,7 +39,7 @@ export async function fetchTrendingTopics() {
     body: JSON.stringify({
       useWebSearch: true,
       systemPrompt: 'You are a trend analyst. Search the web for current trending topics, then return ONLY a JSON array. No other text or markdown.',
-      prompt: `Search for "trending LinkedIn topics today" and "top business news today". Based on the search results, return a JSON array of 8-10 trending topics that would make great LinkedIn posts. Each object must have:\n- "headline": a concise, engaging headline (max 12 words)\n- "source": the publication or website name\n- "snippet": a 1-sentence summary of why this is trending\n- "image": the og:image URL or article thumbnail URL from the source (or null if unavailable)\n\nFocus on business, tech, leadership, careers, and industry trends. Return ONLY the JSON array.`,
+      prompt: `Search for "trending LinkedIn topics today" and "top business news today". Based on the search results, return a JSON array of 8-10 trending topics that would make great LinkedIn posts. Each object must have:\n- "headline": a concise, engaging headline (max 12 words)\n- "source": the publication or website name\n- "snippet": a 1-sentence summary of why this is trending\n- "url": the full article URL from the search result\n\nFocus on business, tech, leadership, careers, and industry trends. Return ONLY the JSON array.`,
     }),
   })
 
@@ -49,12 +49,18 @@ export async function fetchTrendingTopics() {
   }
 
   const data = await res.json()
-  const contentArray = data.content
+  const topics = data.content
 
-  // Find the last text block in the response (Claude's synthesized answer)
-  const textBlock = [...contentArray].reverse().find((b) => b.type === 'text')
-  if (!textBlock?.text) throw new Error('No text response from search')
+  // The function now returns parsed + enriched topics directly (array)
+  if (Array.isArray(topics)) return topics
 
-  const cleaned = textBlock.text.replace(/```(?:json)?\s*\n?/g, '').trim()
-  return JSON.parse(cleaned)
+  // Fallback: if the function returned raw content blocks, parse them
+  if (Array.isArray(topics) && topics[0]?.type) {
+    const textBlock = [...topics].reverse().find((b) => b.type === 'text')
+    if (!textBlock?.text) throw new Error('No text response from search')
+    const cleaned = textBlock.text.replace(/```(?:json)?\s*\n?/g, '').trim()
+    return JSON.parse(cleaned)
+  }
+
+  throw new Error('Unexpected response format')
 }

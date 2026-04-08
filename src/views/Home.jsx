@@ -111,21 +111,38 @@ function sourceGradient(source) {
   return `linear-gradient(${angle}deg, hsl(${h1}, ${s1}%, ${l1}%), hsl(${h2}, ${s2}%, ${l2}%))`
 }
 
-function TopicVisual({ source, domain }) {
-  const [logoFailed, setLogoFailed] = useState(false)
+function TopicVisual({ source, domain, imageUrl }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const [faviconFailed, setFaviconFailed] = useState(false)
   const faviconUrl = domain
     ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
     : null
 
+  // Full-bleed article image
+  if (imageUrl && !imgFailed) {
+    return (
+      <div className="topic-visual-wrap">
+        <img
+          className="topic-hero"
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          onError={() => setImgFailed(true)}
+        />
+      </div>
+    )
+  }
+
+  // Gradient fallback with favicon
   return (
     <div className="topic-visual" style={{ background: sourceGradient(source) }}>
-      {faviconUrl && !logoFailed ? (
+      {faviconUrl && !faviconFailed ? (
         <img
           className="topic-logo"
           src={faviconUrl}
           alt={source}
           loading="lazy"
-          onError={() => setLogoFailed(true)}
+          onError={() => setFaviconFailed(true)}
         />
       ) : (
         <>
@@ -213,7 +230,7 @@ export default function Home({ onSelectTopic }) {
       <div className="topics-grid">
         {topics.map((t, i) => (
           <div key={i} className="topic-card">
-            <TopicVisual source={t.source} domain={getDomain(t)} />
+            <TopicVisual source={t.source} domain={getDomain(t)} imageUrl={t.image_url} />
             <div className="topic-body">
               <div className="topic-source">
                 <TrendingUp size={13} />
