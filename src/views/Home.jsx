@@ -113,14 +113,16 @@ function sourceGradient(source) {
 
 function TopicVisual({ source, domain }) {
   const [logoFailed, setLogoFailed] = useState(false)
-  const logoUrl = domain ? `https://logo.clearbit.com/${domain}` : null
+  const faviconUrl = domain
+    ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+    : null
 
   return (
     <div className="topic-visual" style={{ background: sourceGradient(source) }}>
-      {logoUrl && !logoFailed ? (
+      {faviconUrl && !logoFailed ? (
         <img
           className="topic-logo"
-          src={logoUrl}
+          src={faviconUrl}
           alt={source}
           loading="lazy"
           onError={() => setLogoFailed(true)}
@@ -146,7 +148,10 @@ export default function Home({ onSelectTopic }) {
 
   async function loadTopics() {
     try {
-      const results = await fetchTrendingTopics()
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 8000)
+      )
+      const results = await Promise.race([fetchTrendingTopics(), timeout])
       const valid = Array.isArray(results) ? results : []
       if (valid.length > 0) {
         setTopics(valid)
@@ -169,7 +174,10 @@ export default function Home({ onSelectTopic }) {
     setRefreshing(true)
     setError('')
     try {
-      const results = await fetchTrendingTopics()
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 8000)
+      )
+      const results = await Promise.race([fetchTrendingTopics(), timeout])
       const valid = Array.isArray(results) ? results : []
       if (valid.length > 0) {
         setTopics(valid)

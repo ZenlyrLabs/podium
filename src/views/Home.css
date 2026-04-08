@@ -61,17 +61,18 @@
 }
 
 .topic-logo {
-  height: 40px;
-  width: auto;
-  max-width: 120px;
+  width: 48px;
+  height: 48px;
   object-fit: contain;
-  filter: brightness(0) invert(1);
-  opacity: 0.45;
+  border-radius: 10px;
+  opacity: 0.8;
   transition: opacity 0.15s;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 4px;
 }
 
 .topic-card:hover .topic-logo {
-  opacity: 0.65;
+  opacity: 1;
 }
 
 .topic-visual-icon {

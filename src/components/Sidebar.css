@@ -25,18 +25,7 @@
   gap: 10px;
 }
 
-.topbar-logo {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--gold), #e0c56a);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-heading);
-  font-weight: 700;
-  font-size: 17px;
-  color: #0f0f0f;
+.topbar-mark {
   flex-shrink: 0;
 }
 
