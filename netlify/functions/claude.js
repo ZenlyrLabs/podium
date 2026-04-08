@@ -38,8 +38,8 @@ export async function handler(event) {
       console.log('[claude] Decoded base64-encoded request body')
     }
 
-    const { prompt, systemPrompt, pdfBase64 } = JSON.parse(rawBody)
-    console.log('[claude] Prompt length:', prompt?.length, 'hasPdf:', !!pdfBase64, 'pdfSize:', pdfBase64?.length ?? 0, 'hasSystem:', !!systemPrompt)
+    const { prompt, systemPrompt, pdfBase64, useWebSearch } = JSON.parse(rawBody)
+    console.log('[claude] Prompt length:', prompt?.length, 'hasPdf:', !!pdfBase64, 'pdfSize:', pdfBase64?.length ?? 0, 'hasSystem:', !!systemPrompt, 'webSearch:', !!useWebSearch)
 
     let userContent
     const hasPdf = !!pdfBase64
@@ -75,6 +75,12 @@ export async function handler(event) {
       requestBody.system = systemPrompt
     }
 
+    if (useWebSearch) {
+      requestBody.tools = [{ type: 'web_search_20250305', name: 'web_search' }]
+      requestBody.max_tokens = 4096
+      console.log('[claude] Web search tool enabled')
+    }
+
     // Build headers — PDF document type requires the beta header
     const headers = {
       'Content-Type': 'application/json',
@@ -108,6 +114,12 @@ export async function handler(event) {
     }
 
     const data = await response.json()
+
+    if (useWebSearch) {
+      console.log('[claude] Web search response — blocks:', data.content?.length)
+      return respond(200, { content: data.content })
+    }
+
     const content = data.content?.[0]?.text || ''
     console.log('[claude] Success — response length:', content.length)
 

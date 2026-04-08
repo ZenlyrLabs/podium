@@ -66,7 +66,7 @@ const STYLES = [
   { id: 'conversational', label: 'Conversational', desc: 'Casual, engaging, question-based' },
 ]
 
-export default function CreatePost({ editingDraft, onClearDraft }) {
+export default function CreatePost({ editingDraft, onClearDraft, prefilledTopic, onClearPrefilledTopic }) {
   const [step, setStep] = useState(0)
   const [topic, setTopic] = useState('')
   const [customTopic, setCustomTopic] = useState('')
@@ -78,6 +78,15 @@ export default function CreatePost({ editingDraft, onClearDraft }) {
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (prefilledTopic) {
+      setTopic('custom')
+      setCustomTopic(prefilledTopic)
+      setStep(0)
+      onClearPrefilledTopic?.()
+    }
+  }, [prefilledTopic])
 
   useEffect(() => {
     if (editingDraft) {
