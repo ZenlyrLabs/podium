@@ -3,6 +3,17 @@ import { RefreshCw, TrendingUp, PenLine, Loader2 } from 'lucide-react'
 import { fetchTrendingTopics } from '../utils/api'
 import './Home.css'
 
+function timeAgo(dateStr) {
+  if (!dateStr) return null
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return `${days}d ago`
+}
+
 const CACHE_KEY = 'podium_trending_cache'
 const CACHE_TTL = 2 * 60 * 60 * 1000
 
@@ -232,9 +243,12 @@ export default function Home({ onSelectTopic }) {
           <div key={i} className="topic-card">
             <TopicVisual source={t.source} domain={getDomain(t)} imageUrl={t.image_url} />
             <div className="topic-body">
-              <div className="topic-source">
-                <TrendingUp size={13} />
-                <span>{t.source || 'Trending'}</span>
+              <div className="topic-meta">
+                <div className="topic-source">
+                  <TrendingUp size={13} />
+                  <span>{t.source || 'Trending'}</span>
+                </div>
+                {t.publishedAt && <span className="topic-time">{timeAgo(t.publishedAt)}</span>}
               </div>
               <h3 className="topic-headline">{t.headline}</h3>
               <p className="topic-snippet">{t.snippet}</p>
