@@ -47,27 +47,33 @@
   border-color: var(--gold-border);
 }
 
-/* Image / placeholder */
-.topic-img {
+/* Source visual banner */
+.topic-visual {
   width: 100%;
-  height: 140px;
-  object-fit: cover;
-  display: block;
-}
-
-.topic-img-placeholder {
-  width: 100%;
-  height: 140px;
+  height: 100px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
 }
 
-.topic-img-placeholder span {
+.topic-visual-icon {
   font-family: var(--font-heading);
-  font-size: 36px;
+  font-size: 28px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.15);
+  line-height: 1;
+}
+
+.topic-visual-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.25);
 }
 
 /* Card body */

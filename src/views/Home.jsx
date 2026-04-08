@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { RefreshCw, TrendingUp, PenLine, Loader2 } from 'lucide-react'
 import { fetchTrendingTopics } from '../utils/api'
 import './Home.css'
 
 const CACHE_KEY = 'podium_trending_cache'
-const CACHE_TTL = 30 * 60 * 1000 // 30 minutes
+const CACHE_TTL = 2 * 60 * 60 * 1000 // 2 hours
 
 function getCachedTopics() {
   try {
@@ -24,41 +24,41 @@ function setCachedTopics(topics) {
   } catch {}
 }
 
-const GRADIENTS = [
-  'linear-gradient(135deg, #1a1a2e, #16213e)',
-  'linear-gradient(135deg, #0f3460, #16213e)',
-  'linear-gradient(135deg, #1a1a1a, #2d2d2d)',
-  'linear-gradient(135deg, #162447, #1f4068)',
-  'linear-gradient(135deg, #1b1b2f, #162447)',
-  'linear-gradient(135deg, #2c3333, #395B64)',
-  'linear-gradient(135deg, #1a1a2e, #e94560 120%)',
-  'linear-gradient(135deg, #0a0a0a, #c8a84b 200%)',
-  'linear-gradient(135deg, #2d2d2d, #0f3460)',
-  'linear-gradient(135deg, #1b262c, #0f4c75)',
-]
-
-function TopicImage({ src, source, index }) {
-  const [failed, setFailed] = useState(false)
-
-  if (!src || failed) {
-    return (
-      <div
-        className="topic-img-placeholder"
-        style={{ background: GRADIENTS[index % GRADIENTS.length] }}
-      >
-        <span>{(source || 'News').charAt(0).toUpperCase()}</span>
-      </div>
-    )
+// Generate a deterministic gradient from a string (source name)
+function sourceGradient(source) {
+  const str = (source || 'News').toLowerCase()
+  let h1 = 0
+  let h2 = 0
+  for (let i = 0; i < str.length; i++) {
+    h1 = (h1 + str.charCodeAt(i) * 31) % 360
+    h2 = (h2 + str.charCodeAt(i) * 17 + 97) % 360
   }
+  // Keep saturation moderate and lightness dark for the dark theme
+  const s1 = 35 + (h1 % 30) // 35-65%
+  const l1 = 12 + (h1 % 8)  // 12-20%
+  const s2 = 40 + (h2 % 25) // 40-65%
+  const l2 = 18 + (h2 % 10) // 18-28%
+  const angle = 135 + (h1 % 45) // 135-180deg
+  return `linear-gradient(${angle}deg, hsl(${h1}, ${s1}%, ${l1}%), hsl(${h2}, ${s2}%, ${l2}%))`
+}
 
+function sourceIcon(source) {
+  const s = (source || '').toLowerCase()
+  if (s.includes('bloomberg') || s.includes('finance') || s.includes('wall street')) return '$'
+  if (s.includes('tech') || s.includes('verge') || s.includes('wired') || s.includes('ars')) return '<>'
+  if (s.includes('linkedin')) return 'in'
+  if (s.includes('forbes')) return 'F'
+  if (s.includes('reuters') || s.includes('ap news')) return 'R'
+  if (s.includes('harvard') || s.includes('hbr')) return 'H'
+  return (source || 'N').charAt(0).toUpperCase()
+}
+
+function TopicVisual({ source }) {
   return (
-    <img
-      className="topic-img"
-      src={src}
-      alt=""
-      loading="lazy"
-      onError={() => setFailed(true)}
-    />
+    <div className="topic-visual" style={{ background: sourceGradient(source) }}>
+      <span className="topic-visual-icon">{sourceIcon(source)}</span>
+      <span className="topic-visual-label">{source || 'News'}</span>
+    </div>
   )
 }
 
@@ -67,8 +67,9 @@ export default function Home({ onSelectTopic }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const hasFetched = useRef(false)
 
-  async function loadTopics({ skipCache = false } = {}) {
+  async function loadTopics() {
     setError('')
     try {
       const results = await fetchTrendingTopics()
@@ -77,27 +78,35 @@ export default function Home({ onSelectTopic }) {
       if (valid.length > 0) setCachedTopics(valid)
     } catch (e) {
       console.error('Trending topics error:', e)
-      if (topics.length === 0) {
-        setError('Failed to load trending topics. Please try again.')
-      }
+      // Only show error if we have nothing to display
+      setTopics((prev) => {
+        if (prev.length === 0) setError('Failed to load trending topics. Please try again.')
+        return prev
+      })
     }
   }
 
   useEffect(() => {
     const cached = getCachedTopics()
     if (cached) {
+      // Instant display from cache — no spinner
       setTopics(cached)
       setLoading(false)
-      // Refresh in background
-      loadTopics({ skipCache: true })
+      // Silent background refresh
+      if (!hasFetched.current) {
+        hasFetched.current = true
+        loadTopics()
+      }
     } else {
+      // First visit ever — show spinner
+      hasFetched.current = true
       loadTopics().finally(() => setLoading(false))
     }
   }, [])
 
   async function handleRefresh() {
     setRefreshing(true)
-    await loadTopics({ skipCache: true })
+    await loadTopics()
     setRefreshing(false)
   }
 
@@ -136,7 +145,7 @@ export default function Home({ onSelectTopic }) {
         <div className="topics-grid">
           {topics.map((t, i) => (
             <div key={i} className="topic-card">
-              <TopicImage src={t.image} source={t.source} index={i} />
+              <TopicVisual source={t.source} />
               <div className="topic-body">
                 <div className="topic-source">
                   <TrendingUp size={13} />
