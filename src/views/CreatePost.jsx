@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, ArrowRight, Sparkles, Save, Copy, Check, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Sparkles, Save, Copy, Check, Loader2, ExternalLink } from 'lucide-react'
 import StepIndicator from '../components/StepIndicator'
 import { callClaude } from '../utils/api'
 import { saveDraft, getProfile } from '../utils/storage'
@@ -130,6 +130,9 @@ export default function CreatePost({ editingDraft, onClearDraft, activeArticle, 
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [includeSourceLink, setIncludeSourceLink] = useState(true)
+  // Source info preserved across drafts even if activeArticle was cleared
+  const [draftSource, setDraftSource] = useState(null)
 
   // When an active article arrives (from Home), auto-configure the wizard.
   // Note: activeArticle is stored in App.jsx and persists across all steps.
@@ -155,6 +158,12 @@ export default function CreatePost({ editingDraft, onClearDraft, activeArticle, 
       setPostContent(editingDraft.content || '')
       setTopic(editingDraft.topic || '')
       setStyle(editingDraft.style || '')
+      if (editingDraft.source_url || editingDraft.source_headline) {
+        setDraftSource({
+          headline: editingDraft.source_headline || '',
+          url: editingDraft.source_url || '',
+        })
+      }
       setStep(4)
     }
   }, [editingDraft])
@@ -168,9 +177,16 @@ export default function CreatePost({ editingDraft, onClearDraft, activeArticle, 
     setSelectedHook('')
     setPostContent('')
     setError('')
+    setDraftSource(null)
     onClearArticle?.()
     onClearDraft()
   }
+
+  // Resolve the source to display in the editor — prefer live activeArticle,
+  // fall back to draftSource (when reopening a saved draft)
+  const displaySource = activeArticle?.url
+    ? { headline: activeArticle.headline, url: activeArticle.url }
+    : draftSource
 
   const activeTopic = topic === 'custom' ? customTopic : topic
 
@@ -261,13 +277,19 @@ export default function CreatePost({ editingDraft, onClearDraft, activeArticle, 
       topic: activeTopic,
       style,
       hook: selectedHook,
+      source_url: displaySource?.url || null,
+      source_headline: displaySource?.headline || null,
     })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
   function handleCopy() {
-    navigator.clipboard.writeText(postContent)
+    let textToCopy = postContent
+    if (includeSourceLink && displaySource?.url) {
+      textToCopy += `\n\nSource: ${displaySource.headline}\n${displaySource.url}`
+    }
+    navigator.clipboard.writeText(textToCopy)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -428,6 +450,33 @@ export default function CreatePost({ editingDraft, onClearDraft, activeArticle, 
                 placeholder="Your post content will appear here..."
               />
               <div className="char-count">{postContent.length} characters</div>
+
+              {displaySource?.url && (
+                <div className="source-link-card">
+                  <div className="source-link-info">
+                    <span className="source-link-label">Source article</span>
+                    <div className="source-link-headline">{displaySource.headline}</div>
+                    <a
+                      className="source-link-url"
+                      href={displaySource.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink size={12} />
+                      {displaySource.url}
+                    </a>
+                  </div>
+                  <label className="source-link-toggle">
+                    <input
+                      type="checkbox"
+                      checked={includeSourceLink}
+                      onChange={(e) => setIncludeSourceLink(e.target.checked)}
+                    />
+                    <span>Include link when copying</span>
+                  </label>
+                </div>
+              )}
+
               <div className="editor-actions">
                 <button className="btn-primary" onClick={handleCopy}>
                   {copied ? <Check size={16} /> : <Copy size={16} />}
