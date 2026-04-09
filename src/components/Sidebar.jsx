@@ -1,10 +1,11 @@
-import { Home, PenLine, FileText, User } from 'lucide-react'
+import { Home, PenLine, FileText, BookOpen, User } from 'lucide-react'
 import './Sidebar.css'
 
 const navItems = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'create', label: 'Create Post', icon: PenLine },
   { id: 'drafts', label: 'Drafts', icon: FileText },
+  { id: 'guide', label: 'Guide', icon: BookOpen },
   { id: 'profile', label: 'My Profile', icon: User },
 ]
 

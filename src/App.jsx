@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar'
 import Home from './views/Home'
 import CreatePost from './views/CreatePost'
 import Drafts from './views/Drafts'
+import Guide from './views/Guide'
 import MyProfile from './views/MyProfile'
 import './App.css'
 
@@ -45,6 +46,7 @@ export default function App() {
           />
         )}
         {view === 'drafts' && <Drafts onEdit={handleEditDraft} />}
+        {view === 'guide' && <Guide />}
         {view === 'profile' && <MyProfile />}
       </main>
     </div>
