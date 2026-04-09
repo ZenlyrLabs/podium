@@ -32,7 +32,7 @@ export async function callClaudeWithPdf(pdfBase64, prompt, systemPrompt = '') {
   return data.content
 }
 
-export async function fetchTrendingTopics() {
+export async function fetchTrendingSections() {
   const res = await fetch('/api/trending')
 
   if (!res.ok) {
@@ -41,5 +41,5 @@ export async function fetchTrendingTopics() {
   }
 
   const data = await res.json()
-  return data.articles || []
+  return data.sections || []
 }
