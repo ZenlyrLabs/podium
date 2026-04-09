@@ -56,13 +56,16 @@ export default function App() {
     <div className="app">
       <Sidebar active={view} onNavigate={handleViewChange} />
       <main className="main-content">
-        {view === 'home' && <Home onSelectTopic={handleSelectTopic} />}
+        {view === 'home' && (
+          <Home onSelectTopic={handleSelectTopic} onNavigate={handleViewChange} />
+        )}
         {view === 'create' && (
           <CreatePost
             editingDraft={editingDraft}
             onClearDraft={() => setEditingDraft(null)}
             activeArticle={activeArticle}
             onClearArticle={handleClearArticle}
+            onNavigate={handleViewChange}
           />
         )}
         {view === 'drafts' && <Drafts onEdit={handleEditDraft} />}

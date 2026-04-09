@@ -2,15 +2,18 @@ import { useState, useEffect, useRef } from 'react'
 import { Upload, Save, Check, Loader2 } from 'lucide-react'
 import { getProfile, saveProfile } from '../utils/storage'
 import { callClaude, callClaudeWithPdf } from '../utils/api'
+import { calculateProfileCompleteness } from '../utils/profileCompleteness'
 import './MyProfile.css'
 
 const EXTRACT_PROMPT = `Analyze this LinkedIn profile thoroughly and return a JSON object with these keys:
 
 - "name": full name
 - "headline": current job title and company
+- "industry": the primary industry they work in (e.g. "SaaS / B2B Software", "Healthcare", "Fintech")
 - "summary": a 3-4 sentence career narrative covering their arc, what drives them, and what they're known for
 - "accomplishments": an array of 3-5 specific career achievements — include hard metrics, numbers, percentages, team sizes, revenue figures, or growth stats wherever possible (e.g. "Scaled engineering org from 5 to 40 engineers in 18 months")
 - "expertise": an array of 4-8 core skill/domain areas they are strongest in
+- "targetAudience": who this person likely writes for on LinkedIn (e.g. "CTOs and engineering leaders at growth-stage startups")
 - "communicationStyle": a comma-separated string of 3-5 tone descriptors that characterize how this person likely communicates based on their profile (e.g. "direct, data-oriented, uses storytelling, dry humor, concise")
 - "signaturePhrases": an array of 2-4 recurring phrases, terminology, or language patterns found in the profile text
 - "topics": a comma-separated string of topics they likely post about based on their experience
@@ -23,12 +26,15 @@ export default function MyProfile() {
   const [profile, setProfile] = useState({
     name: '',
     headline: '',
+    industry: '',
     summary: '',
     accomplishments: '',
     expertise: '',
+    targetAudience: '',
     communicationStyle: '',
     topics: '',
     voiceSamples: '',
+    pdfUploaded: false,
   })
   const [saved, setSaved] = useState(false)
   const [parsing, setParsing] = useState(false)
@@ -88,12 +94,30 @@ export default function MyProfile() {
         ...prev,
         name: parsed.name || prev.name,
         headline: parsed.headline || prev.headline,
+        industry: parsed.industry || prev.industry,
         summary: parsed.summary || prev.summary,
         accomplishments: formatArrayField(parsed.accomplishments) || prev.accomplishments,
         expertise: formatArrayField(parsed.expertise) || prev.expertise,
+        targetAudience: parsed.targetAudience || prev.targetAudience,
         communicationStyle: parsed.communicationStyle || prev.communicationStyle,
         topics: parsed.topics || prev.topics,
+        pdfUploaded: true,
       }))
+      // Auto-save so pdfUploaded flag persists even if user navigates away without saving
+      const merged = {
+        ...profile,
+        name: parsed.name || profile.name,
+        headline: parsed.headline || profile.headline,
+        industry: parsed.industry || profile.industry,
+        summary: parsed.summary || profile.summary,
+        accomplishments: formatArrayField(parsed.accomplishments) || profile.accomplishments,
+        expertise: formatArrayField(parsed.expertise) || profile.expertise,
+        targetAudience: parsed.targetAudience || profile.targetAudience,
+        communicationStyle: parsed.communicationStyle || profile.communicationStyle,
+        topics: parsed.topics || profile.topics,
+        pdfUploaded: true,
+      }
+      saveProfile(merged)
     } catch (err) {
       console.error('Profile parse error:', err)
       const detail = err.message || String(err)
@@ -102,6 +126,8 @@ export default function MyProfile() {
     setParsing(false)
     if (fileRef.current) fileRef.current.value = ''
   }
+
+  const completeness = calculateProfileCompleteness(profile)
 
   return (
     <div className="profile-view">
@@ -112,6 +138,28 @@ export default function MyProfile() {
       <p className="profile-desc">
         Your profile helps the AI write posts that sound like <strong>you</strong>, not a generic thought leader. Upload your LinkedIn PDF and paste a few of your own posts for best results.
       </p>
+
+      <div className="completeness-card">
+        <div className="completeness-header">
+          <span className="completeness-label">Profile Completeness</span>
+          <span className="completeness-value">{completeness}%</span>
+        </div>
+        <div className="completeness-bar">
+          <div
+            className="completeness-fill"
+            style={{ width: `${completeness}%` }}
+          />
+        </div>
+        {completeness < 100 && (
+          <p className="completeness-hint">
+            {completeness < 50
+              ? "Posts will be generic. Upload your LinkedIn PDF for the biggest jump."
+              : completeness < 70
+              ? "Almost there. Add a few more details for personalised posts."
+              : "Looking good. Fill in the last fields for maximum personalisation."}
+          </p>
+        )}
+      </div>
 
       <div className="upload-area" onClick={() => fileRef.current?.click()}>
         <input
@@ -159,6 +207,16 @@ export default function MyProfile() {
         </div>
 
         <div className="form-group">
+          <label>Industry</label>
+          <input
+            className="text-input"
+            value={profile.industry}
+            onChange={(e) => handleChange('industry', e.target.value)}
+            placeholder="e.g. SaaS / B2B Software, Healthcare, Fintech"
+          />
+        </div>
+
+        <div className="form-group">
           <label>Career Summary</label>
           <textarea
             className="text-input"
@@ -190,6 +248,17 @@ export default function MyProfile() {
             placeholder="e.g. direct, uses storytelling, data-oriented, dry humor"
           />
           <span className="form-hint">How would you describe your writing tone?</span>
+        </div>
+
+        <div className="form-group">
+          <label>Target Audience</label>
+          <input
+            className="text-input"
+            value={profile.targetAudience}
+            onChange={(e) => handleChange('targetAudience', e.target.value)}
+            placeholder="e.g. CTOs and engineering leaders at growth-stage startups"
+          />
+          <span className="form-hint">Who do you write for on LinkedIn?</span>
         </div>
 
         <div className="form-group">

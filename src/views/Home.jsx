@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { RefreshCw, TrendingUp, PenLine } from 'lucide-react'
+import { RefreshCw, TrendingUp, PenLine, AlertCircle, ArrowRight } from 'lucide-react'
 import { fetchTrendingSections } from '../utils/api'
+import { getProfile } from '../utils/storage'
+import { calculateProfileCompleteness } from '../utils/profileCompleteness'
 import './Home.css'
 
 function timeAgo(dateStr) {
@@ -225,11 +227,20 @@ function mergeWithFallbacks(fresh) {
   })
 }
 
-export default function Home({ onSelectTopic }) {
+export default function Home({ onSelectTopic, onNavigate }) {
   const [sections, setSections] = useState(() => getCachedSections() || FALLBACK_SECTIONS)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const hasFetched = useRef(false)
+  const [profileCompleteness, setProfileCompleteness] = useState(() =>
+    calculateProfileCompleteness(getProfile())
+  )
+
+  // Re-read profile completeness whenever the Home view mounts (user may have
+  // just updated their profile)
+  useEffect(() => {
+    setProfileCompleteness(calculateProfileCompleteness(getProfile()))
+  }, [])
 
   async function loadSections() {
     try {
@@ -278,6 +289,29 @@ export default function Home({ onSelectTopic }) {
 
   return (
     <div className="home-view">
+      {profileCompleteness < 70 && (
+        <div className="onboarding-banner">
+          <div className="onboarding-banner-icon">
+            <AlertCircle size={20} />
+          </div>
+          <div className="onboarding-banner-body">
+            <div className="onboarding-banner-title">
+              Your posts will sound generic until you set up your profile.
+            </div>
+            <div className="onboarding-banner-subtitle">
+              Complete your profile to get posts that sound like you.
+            </div>
+          </div>
+          <button
+            className="onboarding-banner-btn"
+            onClick={() => onNavigate?.('profile')}
+          >
+            Complete Profile
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      )}
+
       <div className="home-header">
         <div>
           <h2>Trending Now</h2>
