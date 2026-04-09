@@ -195,7 +195,16 @@ function TopicCard({ topic, onSelectTopic }) {
         <p className="topic-snippet">{topic.snippet}</p>
         <button
           className="btn-primary write-btn"
-          onClick={() => onSelectTopic(topic)}
+          onClick={() => {
+            console.log('[Home] Write Post About This →', {
+              headline: topic.headline,
+              source: topic.source,
+              hasSnippet: !!topic.snippet,
+              snippetLength: topic.snippet?.length,
+              hasImage: !!topic.image_url,
+            })
+            onSelectTopic(topic)
+          }}
         >
           <PenLine size={14} />
           Write Post About This

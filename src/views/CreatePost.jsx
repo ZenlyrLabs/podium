@@ -42,9 +42,34 @@ function buildAuthorBrief(profile) {
   return sections.join('\n')
 }
 
-const HOOK_SYSTEM = `You are a LinkedIn ghostwriter who writes in the exact voice and style of the author described below. Study their voice samples carefully — match their sentence structure, vocabulary, rhythm, and personality. Hooks should feel like something this specific person would write, not a generic content creator. Return valid JSON only — an array of 4 strings.`
+function buildArticleBlock(article) {
+  if (!article) return ''
+  const parts = ['=== NEWS ARTICLE THE AUTHOR IS REACTING TO ===']
+  if (article.headline) parts.push(`Title: ${article.headline}`)
+  if (article.source) parts.push(`Source: ${article.source}`)
+  if (article.publishedAt) parts.push(`Published: ${article.publishedAt}`)
+  if (article.url) parts.push(`URL: ${article.url}`)
+  if (article.snippet) parts.push(`Summary: ${article.snippet}`)
+  parts.push('=== END ARTICLE ===')
+  return parts.join('\n')
+}
 
-const POST_SYSTEM = `You are a LinkedIn ghostwriter who writes in the exact voice and style of the author described below. Study their voice samples carefully — match their sentence structure, vocabulary, rhythm, and personality precisely. Draw on their real accomplishments and expertise to add specific, authentic details. Never sound generic, corporate, or like a template. Write the post content only — no explanations, preamble, or hashtags.`
+const BASE_HOOK_SYSTEM = `You are a LinkedIn ghostwriter who writes in the exact voice and style of the author described below. Study their voice samples carefully — match their sentence structure, vocabulary, rhythm, and personality. Hooks should feel like something this specific person would write, not a generic content creator. Return valid JSON only — an array of 4 strings.`
+
+const BASE_POST_SYSTEM = `You are a LinkedIn ghostwriter who writes in the exact voice and style of the author described below. Study their voice samples carefully — match their sentence structure, vocabulary, rhythm, and personality precisely. Draw on their real accomplishments and expertise to add specific, authentic details. Never sound generic, corporate, or like a template. Write the post content only — no explanations, preamble, or hashtags.`
+
+const COMMENTARY_SYSTEM_ADDENDUM = `
+
+IMPORTANT — COMMENTARY MODE:
+The author is reacting to a specific news article. The full article details are included in the user message below. You MUST:
+- Reference the specific article in the opening (mention the source or the actual news)
+- Quickly pivot to the author's own insight, experience, or professional opinion
+- Add genuine expert value beyond summarizing the news
+- Use specific details from the article (title, source, facts from the summary)
+- End with a thought-provoking question to drive engagement
+- Sound like a genuine expert reaction — never a news summary or press release
+
+Do NOT write a generic post. The article context is critical — use it.`
 
 const TOPICS = [
   'Leadership & Management',
@@ -93,12 +118,7 @@ function ArticlePreviewCard({ article }) {
   )
 }
 
-function buildArticleContext(article) {
-  if (!article || !article.snippet) return ''
-  return `\n\nThe user wants to write a LinkedIn commentary post about this article:\nTitle: ${article.headline}\nSource: ${article.source || 'Unknown'}\nSummary: ${article.snippet}\n\nWrite a post where the author shares their expert perspective and professional opinion on this news. The post should:\n- Reference the article/news briefly in the opening\n- Pivot quickly to the author's own insight, experience or opinion\n- Add value beyond just summarizing the news\n- End with a question to drive engagement\n- Sound like a genuine expert reaction, not a news summary`
-}
-
-export default function CreatePost({ editingDraft, onClearDraft, prefilledArticle, onClearPrefilledArticle }) {
+export default function CreatePost({ editingDraft, onClearDraft, activeArticle, onClearArticle }) {
   const [step, setStep] = useState(0)
   const [topic, setTopic] = useState('')
   const [customTopic, setCustomTopic] = useState('')
@@ -110,21 +130,25 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledArticl
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [article, setArticle] = useState(null)
 
+  // When an active article arrives (from Home), auto-configure the wizard.
+  // Note: activeArticle is stored in App.jsx and persists across all steps.
   useEffect(() => {
-    if (prefilledArticle) {
-      setArticle(prefilledArticle)
+    if (activeArticle) {
+      console.log('[CreatePost] activeArticle received:', {
+        headline: activeArticle.headline,
+        source: activeArticle.source,
+        hasSnippet: !!activeArticle.snippet,
+      })
       setTopic('custom')
-      setCustomTopic(prefilledArticle.headline || '')
-      // If the article came with full context (snippet/source), pre-select Commentary
-      if (prefilledArticle.snippet) {
+      setCustomTopic(activeArticle.headline || '')
+      if (activeArticle.snippet && !style) {
         setStyle('commentary')
       }
-      setStep(0)
-      onClearPrefilledArticle?.()
+      if (step > 0) setStep(0)
     }
-  }, [prefilledArticle])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeArticle])
 
   useEffect(() => {
     if (editingDraft) {
@@ -144,30 +168,50 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledArticl
     setSelectedHook('')
     setPostContent('')
     setError('')
-    setArticle(null)
+    onClearArticle?.()
     onClearDraft()
   }
 
   const activeTopic = topic === 'custom' ? customTopic : topic
 
-  const isCommentary = style === 'commentary' && article?.snippet
-  const articleCtx = isCommentary ? buildArticleContext(article) : ''
+  // Article context is used whenever activeArticle is present with a snippet,
+  // regardless of whether the user explicitly chose Commentary style.
+  const hasArticleContext = !!activeArticle?.snippet
+  const isCommentary = style === 'commentary' || hasArticleContext
 
   async function generateHooks() {
     setLoading(true)
     setError('')
     const profile = getProfile()
     const brief = profile.name ? `\n\n${buildAuthorBrief(profile)}` : ''
-    try {
-      const userPrompt = isCommentary
-        ? `Generate 4 compelling LinkedIn post hooks/opening lines for a commentary post reacting to the news article below. Each hook should briefly reference the news then pivot to the author's perspective. Each hook is 1-2 sentences, attention-grabbing, and authentically in the author's voice.${articleCtx}${brief}\n\nReturn ONLY a JSON array of 4 strings, no other text.`
-        : `Generate 4 compelling LinkedIn post hooks/opening lines about "${activeTopic}" in a ${style} style. Each hook should be 1-2 sentences that grab attention and feel authentically written by this author — not generic.${brief}\n\nReturn ONLY a JSON array of 4 strings, no other text.`
+    const articleBlock = hasArticleContext ? `\n\n${buildArticleBlock(activeArticle)}` : ''
 
-      const result = await callClaude(userPrompt, HOOK_SYSTEM)
+    // Build system prompt — inject article context and commentary addendum when reacting to an article
+    const systemPrompt = hasArticleContext
+      ? `${BASE_HOOK_SYSTEM}${COMMENTARY_SYSTEM_ADDENDUM}${articleBlock}`
+      : BASE_HOOK_SYSTEM
+
+    const userPrompt = hasArticleContext
+      ? `Generate 4 compelling LinkedIn post hooks/opening lines for a commentary post reacting to the news article above. Each hook should briefly reference the news (mention the article or source) then pivot to the author's perspective. Each hook is 1-2 sentences, attention-grabbing, and authentically in the author's voice.${brief}\n\nReturn ONLY a JSON array of 4 strings, no other text.`
+      : `Generate 4 compelling LinkedIn post hooks/opening lines about "${activeTopic}" in a ${style} style. Each hook should be 1-2 sentences that grab attention and feel authentically written by this author — not generic.${brief}\n\nReturn ONLY a JSON array of 4 strings, no other text.`
+
+    console.log('[CreatePost.generateHooks]', {
+      hasArticleContext,
+      style,
+      isCommentary,
+      activeTopic,
+      systemPromptLength: systemPrompt.length,
+      userPromptLength: userPrompt.length,
+      articleHeadline: activeArticle?.headline,
+    })
+
+    try {
+      const result = await callClaude(userPrompt, systemPrompt)
       const parsed = JSON.parse(stripMarkdownFences(result))
       setHooks(Array.isArray(parsed) ? parsed : [])
       setStep(3)
     } catch (e) {
+      console.error('[CreatePost.generateHooks] error:', e)
       setError('Failed to generate hooks. Please check your API key and try again.')
     }
     setLoading(false)
@@ -178,15 +222,33 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledArticl
     setError('')
     const profile = getProfile()
     const brief = profile.name ? `\n\n${buildAuthorBrief(profile)}` : ''
-    try {
-      const userPrompt = isCommentary
-        ? `Write a LinkedIn commentary post reacting to the news article below. Start with this hook: "${selectedHook}"${articleCtx}${brief}\n\nRequirements:\n- 150-250 words, optimized for LinkedIn\n- Reference the article briefly in the opening, then pivot to the author's insight/experience\n- Add genuine expert value beyond summarizing the news\n- Use line breaks for readability\n- End with a thought-provoking question\n- Do NOT include hashtags\n- Must sound like the author wrote it, not a ghostwriter`
-        : `Write a LinkedIn post about "${activeTopic}" in a ${style} style. Start with this hook: "${selectedHook}"${brief}\n\nRequirements:\n- 150-250 words, optimized for LinkedIn\n- Use line breaks for readability\n- Reference the author's real experience and accomplishments where relevant\n- End with a thought-provoking question or call to action\n- Do NOT include hashtags\n- Must sound like the author wrote it, not a ghostwriter`
+    const articleBlock = hasArticleContext ? `\n\n${buildArticleBlock(activeArticle)}` : ''
 
-      const result = await callClaude(userPrompt, POST_SYSTEM)
+    const systemPrompt = hasArticleContext
+      ? `${BASE_POST_SYSTEM}${COMMENTARY_SYSTEM_ADDENDUM}${articleBlock}`
+      : BASE_POST_SYSTEM
+
+    const userPrompt = hasArticleContext
+      ? `Write a LinkedIn commentary post reacting to the news article shown in the system prompt above. Start with this hook: "${selectedHook}"${brief}\n\nRequirements:\n- 150-250 words, optimized for LinkedIn\n- Reference the article by name/source in the opening, then pivot to the author's insight\n- Use specific details from the article summary\n- Add genuine expert value beyond summarizing the news\n- Use line breaks for readability\n- End with a thought-provoking question\n- Do NOT include hashtags\n- Must sound like the author wrote it, not a ghostwriter`
+      : `Write a LinkedIn post about "${activeTopic}" in a ${style} style. Start with this hook: "${selectedHook}"${brief}\n\nRequirements:\n- 150-250 words, optimized for LinkedIn\n- Use line breaks for readability\n- Reference the author's real experience and accomplishments where relevant\n- End with a thought-provoking question or call to action\n- Do NOT include hashtags\n- Must sound like the author wrote it, not a ghostwriter`
+
+    console.log('[CreatePost.generatePost]', {
+      hasArticleContext,
+      style,
+      isCommentary,
+      selectedHook: selectedHook?.substring(0, 60),
+      systemPromptLength: systemPrompt.length,
+      userPromptLength: userPrompt.length,
+      articleHeadline: activeArticle?.headline,
+      articleInSystemPrompt: systemPrompt.includes(activeArticle?.headline || '___NONE___'),
+    })
+
+    try {
+      const result = await callClaude(userPrompt, systemPrompt)
       setPostContent(result.trim())
       setStep(4)
     } catch (e) {
+      console.error('[CreatePost.generatePost] error:', e)
       setError('Failed to generate post. Please try again.')
     }
     setLoading(false)
@@ -211,9 +273,19 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledArticl
   }
 
   const canNext =
-    (step === 0 && ((article?.snippet) || (topic && (topic !== 'custom' || customTopic.trim())))) ||
+    (step === 0 && (hasArticleContext || (topic && (topic !== 'custom' || customTopic.trim())))) ||
     (step === 1 && style) ||
     (step === 3 && selectedHook)
+
+  // Trace render state on every render
+  console.log('[CreatePost.render]', {
+    step,
+    style,
+    hasActiveArticle: !!activeArticle,
+    hasArticleContext,
+    isCommentary,
+    activeArticleHeadline: activeArticle?.headline,
+  })
 
   return (
     <div className="create-post">
@@ -232,15 +304,20 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledArticl
 
       {step === 0 && (
         <div className="step-content">
-          {article?.snippet ? (
+          {hasArticleContext ? (
             <>
               <h3>Commenting on:</h3>
               <p className="step-desc">You'll share your expert perspective on this news story.</p>
-              <ArticlePreviewCard article={article} />
+              <ArticlePreviewCard article={activeArticle} />
               <div className="article-actions">
                 <button
                   className="btn-text"
-                  onClick={() => { setArticle(null); setTopic(''); setCustomTopic(''); setStyle('') }}
+                  onClick={() => {
+                    onClearArticle?.()
+                    setTopic('')
+                    setCustomTopic('')
+                    setStyle('')
+                  }}
                 >
                   Choose a different topic instead
                 </button>
@@ -287,7 +364,7 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledArticl
           <p className="step-desc">How should your post feel?</p>
           <div className="style-grid">
             {STYLES
-              .filter((s) => s.id !== 'commentary' || article?.snippet)
+              .filter((s) => s.id !== 'commentary' || hasArticleContext)
               .map((s) => (
                 <button
                   key={s.id}
@@ -315,7 +392,7 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledArticl
         <div className="step-content">
           <h3>Pick your hook</h3>
           <p className="step-desc">Choose the opening that resonates most.</p>
-          {isCommentary && <ArticlePreviewCard article={article} />}
+          {hasArticleContext && <ArticlePreviewCard article={activeArticle} />}
           <div className="hooks-list">
             {hooks.map((h, i) => (
               <button
@@ -335,7 +412,7 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledArticl
         <div className="step-content">
           <h3>Your Post</h3>
           <p className="step-desc">Edit the content below and copy when ready.</p>
-          {isCommentary && <ArticlePreviewCard article={article} />}
+          {hasArticleContext && <ArticlePreviewCard article={activeArticle} />}
           {loading ? (
             <div className="loading-step">
               <Loader2 className="spinner" size={32} />
@@ -377,6 +454,7 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledArticl
             className="btn-primary"
             disabled={!canNext || loading}
             onClick={() => {
+              console.log('[CreatePost] Next clicked — step:', step, 'hasArticle:', hasArticleContext)
               if (step === 1) {
                 setStep(2)
                 setTimeout(generateHooks, 100)

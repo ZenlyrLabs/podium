@@ -10,11 +10,13 @@ import './App.css'
 export default function App() {
   const [view, setView] = useState('home')
   const [editingDraft, setEditingDraft] = useState(null)
-  const [prefilledArticle, setPrefilledArticle] = useState(null)
+  // Single source of truth for the active article context — persists across Create Post steps
+  const [activeArticle, setActiveArticle] = useState(null)
 
   function handleEditDraft(draft) {
+    console.log('[App] handleEditDraft', draft?.id)
     setEditingDraft(draft)
-    setPrefilledArticle(null)
+    setActiveArticle(null)
     setView('create')
   }
 
@@ -24,15 +26,28 @@ export default function App() {
       typeof articleOrTopic === 'string'
         ? { headline: articleOrTopic }
         : articleOrTopic
-    setPrefilledArticle(article)
+    console.log('[App] handleSelectTopic — article:', {
+      headline: article?.headline,
+      source: article?.source,
+      hasSnippet: !!article?.snippet,
+      snippetLength: article?.snippet?.length,
+      hasImage: !!article?.image_url,
+    })
+    setActiveArticle(article)
     setEditingDraft(null)
     setView('create')
   }
 
+  function handleClearArticle() {
+    console.log('[App] handleClearArticle')
+    setActiveArticle(null)
+  }
+
   function handleViewChange(v) {
+    console.log('[App] handleViewChange →', v)
     if (v !== 'create') {
       setEditingDraft(null)
-      setPrefilledArticle(null)
+      setActiveArticle(null)
     }
     setView(v)
   }
@@ -46,8 +61,8 @@ export default function App() {
           <CreatePost
             editingDraft={editingDraft}
             onClearDraft={() => setEditingDraft(null)}
-            prefilledArticle={prefilledArticle}
-            onClearPrefilledArticle={() => setPrefilledArticle(null)}
+            activeArticle={activeArticle}
+            onClearArticle={handleClearArticle}
           />
         )}
         {view === 'drafts' && <Drafts onEdit={handleEditDraft} />}
