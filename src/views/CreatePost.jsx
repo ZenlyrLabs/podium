@@ -58,15 +58,47 @@ const TOPICS = [
 ]
 
 const STYLES = [
-  { id: 'storytelling', label: 'Storytelling', desc: 'Narrative-driven, personal anecdotes' },
-  { id: 'educational', label: 'Educational', desc: 'Teach something valuable, how-to format' },
-  { id: 'contrarian', label: 'Contrarian', desc: 'Challenge conventional wisdom' },
-  { id: 'inspirational', label: 'Inspirational', desc: 'Motivate and uplift your audience' },
-  { id: 'data-driven', label: 'Data-Driven', desc: 'Facts, stats, and evidence-based insights' },
-  { id: 'conversational', label: 'Conversational', desc: 'Casual, engaging, question-based' },
+  { id: 'storytelling', label: 'Storytelling', emoji: '📖', desc: 'Narrative-driven, personal anecdotes' },
+  { id: 'educational', label: 'Educational', emoji: '🎓', desc: 'Teach something valuable, how-to format' },
+  { id: 'contrarian', label: 'Contrarian', emoji: '🔥', desc: 'Challenge conventional wisdom' },
+  { id: 'inspirational', label: 'Inspirational', emoji: '✨', desc: 'Motivate and uplift your audience' },
+  { id: 'data-driven', label: 'Data-Driven', emoji: '📊', desc: 'Facts, stats, and evidence-based insights' },
+  { id: 'conversational', label: 'Conversational', emoji: '💭', desc: 'Casual, engaging, question-based' },
+  { id: 'commentary', label: 'Commentary', emoji: '💬', desc: 'Share your expert perspective on a trending news story' },
 ]
 
-export default function CreatePost({ editingDraft, onClearDraft, prefilledTopic, onClearPrefilledTopic }) {
+function ArticlePreviewCard({ article }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const showImage = article.image_url && !imgFailed
+
+  return (
+    <div className="article-preview">
+      {showImage && (
+        <img
+          className="article-preview-img"
+          src={article.image_url}
+          alt=""
+          loading="lazy"
+          onError={() => setImgFailed(true)}
+        />
+      )}
+      <div className="article-preview-body">
+        <div className="article-preview-source">{article.source || 'News'}</div>
+        <div className="article-preview-headline">{article.headline}</div>
+        {article.snippet && (
+          <div className="article-preview-snippet">{article.snippet}</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function buildArticleContext(article) {
+  if (!article || !article.snippet) return ''
+  return `\n\nThe user wants to write a LinkedIn commentary post about this article:\nTitle: ${article.headline}\nSource: ${article.source || 'Unknown'}\nSummary: ${article.snippet}\n\nWrite a post where the author shares their expert perspective and professional opinion on this news. The post should:\n- Reference the article/news briefly in the opening\n- Pivot quickly to the author's own insight, experience or opinion\n- Add value beyond just summarizing the news\n- End with a question to drive engagement\n- Sound like a genuine expert reaction, not a news summary`
+}
+
+export default function CreatePost({ editingDraft, onClearDraft, prefilledArticle, onClearPrefilledArticle }) {
   const [step, setStep] = useState(0)
   const [topic, setTopic] = useState('')
   const [customTopic, setCustomTopic] = useState('')
@@ -78,15 +110,21 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledTopic,
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [article, setArticle] = useState(null)
 
   useEffect(() => {
-    if (prefilledTopic) {
+    if (prefilledArticle) {
+      setArticle(prefilledArticle)
       setTopic('custom')
-      setCustomTopic(prefilledTopic)
+      setCustomTopic(prefilledArticle.headline || '')
+      // If the article came with full context (snippet/source), pre-select Commentary
+      if (prefilledArticle.snippet) {
+        setStyle('commentary')
+      }
       setStep(0)
-      onClearPrefilledTopic?.()
+      onClearPrefilledArticle?.()
     }
-  }, [prefilledTopic])
+  }, [prefilledArticle])
 
   useEffect(() => {
     if (editingDraft) {
@@ -106,10 +144,14 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledTopic,
     setSelectedHook('')
     setPostContent('')
     setError('')
+    setArticle(null)
     onClearDraft()
   }
 
   const activeTopic = topic === 'custom' ? customTopic : topic
+
+  const isCommentary = style === 'commentary' && article?.snippet
+  const articleCtx = isCommentary ? buildArticleContext(article) : ''
 
   async function generateHooks() {
     setLoading(true)
@@ -117,10 +159,11 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledTopic,
     const profile = getProfile()
     const brief = profile.name ? `\n\n${buildAuthorBrief(profile)}` : ''
     try {
-      const result = await callClaude(
-        `Generate 4 compelling LinkedIn post hooks/opening lines about "${activeTopic}" in a ${style} style. Each hook should be 1-2 sentences that grab attention and feel authentically written by this author — not generic.${brief}\n\nReturn ONLY a JSON array of 4 strings, no other text.`,
-        HOOK_SYSTEM
-      )
+      const userPrompt = isCommentary
+        ? `Generate 4 compelling LinkedIn post hooks/opening lines for a commentary post reacting to the news article below. Each hook should briefly reference the news then pivot to the author's perspective. Each hook is 1-2 sentences, attention-grabbing, and authentically in the author's voice.${articleCtx}${brief}\n\nReturn ONLY a JSON array of 4 strings, no other text.`
+        : `Generate 4 compelling LinkedIn post hooks/opening lines about "${activeTopic}" in a ${style} style. Each hook should be 1-2 sentences that grab attention and feel authentically written by this author — not generic.${brief}\n\nReturn ONLY a JSON array of 4 strings, no other text.`
+
+      const result = await callClaude(userPrompt, HOOK_SYSTEM)
       const parsed = JSON.parse(stripMarkdownFences(result))
       setHooks(Array.isArray(parsed) ? parsed : [])
       setStep(3)
@@ -136,10 +179,11 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledTopic,
     const profile = getProfile()
     const brief = profile.name ? `\n\n${buildAuthorBrief(profile)}` : ''
     try {
-      const result = await callClaude(
-        `Write a LinkedIn post about "${activeTopic}" in a ${style} style. Start with this hook: "${selectedHook}"${brief}\n\nRequirements:\n- 150-250 words, optimized for LinkedIn\n- Use line breaks for readability\n- Reference the author's real experience and accomplishments where relevant\n- End with a thought-provoking question or call to action\n- Do NOT include hashtags\n- Must sound like the author wrote it, not a ghostwriter`,
-        POST_SYSTEM
-      )
+      const userPrompt = isCommentary
+        ? `Write a LinkedIn commentary post reacting to the news article below. Start with this hook: "${selectedHook}"${articleCtx}${brief}\n\nRequirements:\n- 150-250 words, optimized for LinkedIn\n- Reference the article briefly in the opening, then pivot to the author's insight/experience\n- Add genuine expert value beyond summarizing the news\n- Use line breaks for readability\n- End with a thought-provoking question\n- Do NOT include hashtags\n- Must sound like the author wrote it, not a ghostwriter`
+        : `Write a LinkedIn post about "${activeTopic}" in a ${style} style. Start with this hook: "${selectedHook}"${brief}\n\nRequirements:\n- 150-250 words, optimized for LinkedIn\n- Use line breaks for readability\n- Reference the author's real experience and accomplishments where relevant\n- End with a thought-provoking question or call to action\n- Do NOT include hashtags\n- Must sound like the author wrote it, not a ghostwriter`
+
+      const result = await callClaude(userPrompt, POST_SYSTEM)
       setPostContent(result.trim())
       setStep(4)
     } catch (e) {
@@ -167,7 +211,7 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledTopic,
   }
 
   const canNext =
-    (step === 0 && (topic && (topic !== 'custom' || customTopic.trim()))) ||
+    (step === 0 && ((article?.snippet) || (topic && (topic !== 'custom' || customTopic.trim())))) ||
     (step === 1 && style) ||
     (step === 3 && selectedHook)
 
@@ -188,33 +232,51 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledTopic,
 
       {step === 0 && (
         <div className="step-content">
-          <h3>What's your post about?</h3>
-          <p className="step-desc">Choose a topic or enter your own.</p>
-          <div className="topic-grid">
-            {TOPICS.map((t) => (
-              <button
-                key={t}
-                className={`chip ${topic === t ? 'selected' : ''}`}
-                onClick={() => { setTopic(t); setCustomTopic('') }}
-              >
-                {t}
-              </button>
-            ))}
-            <button
-              className={`chip ${topic === 'custom' ? 'selected' : ''}`}
-              onClick={() => setTopic('custom')}
-            >
-              Custom Topic
-            </button>
-          </div>
-          {topic === 'custom' && (
-            <input
-              className="text-input"
-              placeholder="Enter your topic..."
-              value={customTopic}
-              onChange={(e) => setCustomTopic(e.target.value)}
-              autoFocus
-            />
+          {article?.snippet ? (
+            <>
+              <h3>Commenting on:</h3>
+              <p className="step-desc">You'll share your expert perspective on this news story.</p>
+              <ArticlePreviewCard article={article} />
+              <div className="article-actions">
+                <button
+                  className="btn-text"
+                  onClick={() => { setArticle(null); setTopic(''); setCustomTopic(''); setStyle('') }}
+                >
+                  Choose a different topic instead
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h3>What's your post about?</h3>
+              <p className="step-desc">Choose a topic or enter your own.</p>
+              <div className="topic-grid">
+                {TOPICS.map((t) => (
+                  <button
+                    key={t}
+                    className={`chip ${topic === t ? 'selected' : ''}`}
+                    onClick={() => { setTopic(t); setCustomTopic('') }}
+                  >
+                    {t}
+                  </button>
+                ))}
+                <button
+                  className={`chip ${topic === 'custom' ? 'selected' : ''}`}
+                  onClick={() => setTopic('custom')}
+                >
+                  Custom Topic
+                </button>
+              </div>
+              {topic === 'custom' && (
+                <input
+                  className="text-input"
+                  placeholder="Enter your topic..."
+                  value={customTopic}
+                  onChange={(e) => setCustomTopic(e.target.value)}
+                  autoFocus
+                />
+              )}
+            </>
           )}
         </div>
       )}
@@ -224,16 +286,19 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledTopic,
           <h3>Choose a writing style</h3>
           <p className="step-desc">How should your post feel?</p>
           <div className="style-grid">
-            {STYLES.map((s) => (
-              <button
-                key={s.id}
-                className={`style-card ${style === s.id ? 'selected' : ''}`}
-                onClick={() => setStyle(s.id)}
-              >
-                <strong>{s.label}</strong>
-                <span>{s.desc}</span>
-              </button>
-            ))}
+            {STYLES
+              .filter((s) => s.id !== 'commentary' || article?.snippet)
+              .map((s) => (
+                <button
+                  key={s.id}
+                  className={`style-card ${style === s.id ? 'selected' : ''}`}
+                  onClick={() => setStyle(s.id)}
+                >
+                  <span className="style-emoji">{s.emoji}</span>
+                  <strong>{s.label}</strong>
+                  <span>{s.desc}</span>
+                </button>
+              ))}
           </div>
         </div>
       )}
@@ -250,6 +315,7 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledTopic,
         <div className="step-content">
           <h3>Pick your hook</h3>
           <p className="step-desc">Choose the opening that resonates most.</p>
+          {isCommentary && <ArticlePreviewCard article={article} />}
           <div className="hooks-list">
             {hooks.map((h, i) => (
               <button
@@ -269,6 +335,7 @@ export default function CreatePost({ editingDraft, onClearDraft, prefilledTopic,
         <div className="step-content">
           <h3>Your Post</h3>
           <p className="step-desc">Edit the content below and copy when ready.</p>
+          {isCommentary && <ArticlePreviewCard article={article} />}
           {loading ? (
             <div className="loading-step">
               <Loader2 className="spinner" size={32} />

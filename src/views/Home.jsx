@@ -195,7 +195,7 @@ function TopicCard({ topic, onSelectTopic }) {
         <p className="topic-snippet">{topic.snippet}</p>
         <button
           className="btn-primary write-btn"
-          onClick={() => onSelectTopic(topic.headline)}
+          onClick={() => onSelectTopic(topic)}
         >
           <PenLine size={14} />
           Write Post About This

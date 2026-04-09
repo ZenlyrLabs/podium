@@ -10,16 +10,21 @@ import './App.css'
 export default function App() {
   const [view, setView] = useState('home')
   const [editingDraft, setEditingDraft] = useState(null)
-  const [prefilledTopic, setPrefilledTopic] = useState(null)
+  const [prefilledArticle, setPrefilledArticle] = useState(null)
 
   function handleEditDraft(draft) {
     setEditingDraft(draft)
-    setPrefilledTopic(null)
+    setPrefilledArticle(null)
     setView('create')
   }
 
-  function handleSelectTopic(topic) {
-    setPrefilledTopic(topic)
+  // Accepts either a string topic or a full article object
+  function handleSelectTopic(articleOrTopic) {
+    const article =
+      typeof articleOrTopic === 'string'
+        ? { headline: articleOrTopic }
+        : articleOrTopic
+    setPrefilledArticle(article)
     setEditingDraft(null)
     setView('create')
   }
@@ -27,7 +32,7 @@ export default function App() {
   function handleViewChange(v) {
     if (v !== 'create') {
       setEditingDraft(null)
-      setPrefilledTopic(null)
+      setPrefilledArticle(null)
     }
     setView(v)
   }
@@ -41,8 +46,8 @@ export default function App() {
           <CreatePost
             editingDraft={editingDraft}
             onClearDraft={() => setEditingDraft(null)}
-            prefilledTopic={prefilledTopic}
-            onClearPrefilledTopic={() => setPrefilledTopic(null)}
+            prefilledArticle={prefilledArticle}
+            onClearPrefilledArticle={() => setPrefilledArticle(null)}
           />
         )}
         {view === 'drafts' && <Drafts onEdit={handleEditDraft} />}
