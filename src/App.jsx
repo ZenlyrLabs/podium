@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTheme } from './hooks/useTheme'
 import Sidebar from './components/Sidebar'
 import Home from './views/Home'
 import CreatePost from './views/CreatePost'
@@ -8,6 +9,7 @@ import MyProfile from './views/MyProfile'
 import './App.css'
 
 export default function App() {
+  const { theme, toggleTheme } = useTheme()
   const [view, setView] = useState('home')
   const [editingDraft, setEditingDraft] = useState(null)
   // Single source of truth for the active article context — persists across Create Post steps
@@ -54,7 +56,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <Sidebar active={view} onNavigate={handleViewChange} />
+      <Sidebar active={view} onNavigate={handleViewChange} theme={theme} onToggleTheme={toggleTheme} />
       <main className="main-content">
         {view === 'home' && (
           <Home onSelectTopic={handleSelectTopic} onNavigate={handleViewChange} />

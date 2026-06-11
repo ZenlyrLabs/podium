@@ -29,7 +29,7 @@
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: #c8a84b;
+  background: var(--gold);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -54,10 +54,36 @@
   letter-spacing: 1.2px;
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .topbar-nav {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.theme-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
+.theme-toggle:hover {
+  background: var(--bg-elevated);
+  color: var(--gold);
+  border-color: var(--gold-border);
 }
 
 .topbar-item {

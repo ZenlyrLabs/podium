@@ -1,4 +1,4 @@
-import { Home, PenLine, FileText, BookOpen, User } from 'lucide-react'
+import { Home, PenLine, FileText, BookOpen, User, Sun, Moon } from 'lucide-react'
 import './Sidebar.css'
 
 const navItems = [
@@ -9,7 +9,7 @@ const navItems = [
   { id: 'profile', label: 'My Profile', icon: User },
 ]
 
-export default function Sidebar({ active, onNavigate }) {
+export default function Sidebar({ active, onNavigate, theme, onToggleTheme }) {
   return (
     <header className="topbar">
       <div className="topbar-inner">
@@ -19,18 +19,28 @@ export default function Sidebar({ active, onNavigate }) {
           <span className="topbar-subtitle">by Zenlyr Labs</span>
         </div>
 
-        <nav className="topbar-nav">
-          {navItems.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              className={`topbar-item ${active === id ? 'active' : ''}`}
-              onClick={() => onNavigate(id)}
-            >
-              <Icon size={16} />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
+        <div className="topbar-right">
+          <nav className="topbar-nav">
+            {navItems.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                className={`topbar-item ${active === id ? 'active' : ''}`}
+                onClick={() => onNavigate(id)}
+              >
+                <Icon size={16} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
+
+          <button
+            className="theme-toggle"
+            onClick={onToggleTheme}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        </div>
       </div>
     </header>
   )
