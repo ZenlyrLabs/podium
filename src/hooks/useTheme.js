@@ -4,7 +4,7 @@ const THEME_KEY = 'podium_theme'
 
 export function useTheme() {
   const [theme, setThemeState] = useState(() => {
-    return localStorage.getItem(THEME_KEY) || 'dark'
+    return localStorage.getItem(THEME_KEY) || 'light'
   })
 
   useEffect(() => {
